@@ -1,4 +1,4 @@
-//go:build darwin || dragonfly || freebsd || netbsd || openbsd || rumprun
+//go:build darwin || dragonfly || freebsd || netbsd || openbsd
 
 package netx
 
