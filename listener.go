@@ -116,12 +116,12 @@ func (cfg *TCPListenerConfig) newListener(network, addr string) (net.Listener, e
 }
 
 func (cfg *TCPListenerConfig) newSocket(network, addr string) (fd int, err error) {
-	sa, soType, err := getTCPSockaddr(network, addr)
+	sa, domain, err := getTCPSockaddr(network, addr)
 	if err != nil {
 		return 0, err
 	}
 
-	fd, err = newSocketCloexec(soType, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
+	fd, err = newSocketCloexec(domain, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
 	if err != nil {
 		return 0, err
 	}
@@ -200,7 +200,7 @@ func newSocketCloexecDefault(domain, typ, proto int) (int, error) {
 	return fd, nil
 }
 
-func getTCPSockaddr(network, addr string) (sa syscall.Sockaddr, soType int, err error) {
+func getTCPSockaddr(network, addr string) (sa syscall.Sockaddr, domain int, err error) {
 	tcp, err := net.ResolveTCPAddr(network, addr)
 	if err != nil {
 		return nil, -1, err
