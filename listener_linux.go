@@ -17,21 +17,21 @@ const (
 )
 
 func disableNoDelay(fd int) error {
-	return syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1)
+	return newError("setsockopt", syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1))
 }
 
 func enableReusePort(fd int) error {
-	return syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, soReusePort, 1)
+	return newError("setsockopt", syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, soReusePort, 1))
 }
 
 func enableDeferAccept(fd int) error {
-	return syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_DEFER_ACCEPT, 1)
+	return newError("setsockopt", syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_DEFER_ACCEPT, 1))
 }
 
 const fastOpenQueueLen = 16 * 1024
 
 func enableFastOpen(fd int, queueLen int) error {
-	return syscall.SetsockoptInt(fd, syscall.SOL_TCP, tcpFastOpen, queueLen)
+	return newError("setsockopt", syscall.SetsockoptInt(fd, syscall.SOL_TCP, tcpFastOpen, queueLen))
 }
 
 func soMaxConn() (int, error) {
@@ -65,11 +65,14 @@ func setDefaultSockopts(s, family, sotype int, ipv6only bool) error {
 		// Allow both IP versions even if the OS default
 		// is otherwise. Note that some operating systems
 		// never admit this option.
-		syscall.SetsockoptInt(s, syscall.IPPROTO_IPV6, syscall.IPV6_V6ONLY, boolint(ipv6only))
+		err := newError("setsockopt", syscall.SetsockoptInt(s, syscall.IPPROTO_IPV6, syscall.IPV6_V6ONLY, boolint(ipv6only)))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Allow broadcast.
-	return os.NewSyscallError("setsockopt", syscall.SetsockoptInt(s, syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1))
+	return newError("setsockopt", syscall.SetsockoptInt(s, syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1))
 }
 
 func boolint(b bool) int {

@@ -134,18 +134,18 @@ func (cfg *TCPListenerConfig) newSocket(network, addr string) (fd int, err error
 }
 
 func (cfg *TCPListenerConfig) fdSetup(fd int, sa syscall.Sockaddr, addr string) error {
-	if err := syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
+	if err := newError("setsockopt", syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)); err != nil {
 		return fmt.Errorf("cannot enable SO_REUSEADDR: %s", err)
 	}
 
 	// This should disable Nagle's algorithm in all accepted sockets by default.
 	// Users may enable it with net.TCPConn.SetNoDelay(false).
-	if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
+	if err := newError("setsockopt", syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1)); err != nil {
 		return fmt.Errorf("cannot disable Nagle's algorithm: %s", err)
 	}
 
 	if cfg.ReusePort {
-		if err := syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, soReusePort, 1); err != nil {
+		if err := newError("setsockopt", syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, soReusePort, 1)); err != nil {
 			return fmt.Errorf("cannot enable SO_REUSEPORT: %s", err)
 		}
 	}
@@ -162,7 +162,7 @@ func (cfg *TCPListenerConfig) fdSetup(fd int, sa syscall.Sockaddr, addr string) 
 		}
 	}
 
-	if err := syscall.Bind(fd, sa); err != nil {
+	if err := newError("bind", syscall.Bind(fd, sa)); err != nil {
 		return fmt.Errorf("cannot bind to %q: %s", addr, err)
 	}
 
@@ -173,7 +173,7 @@ func (cfg *TCPListenerConfig) fdSetup(fd int, sa syscall.Sockaddr, addr string) 
 			return fmt.Errorf("cannot determine backlog to pass to listen(2): %s", err)
 		}
 	}
-	if err := syscall.Listen(fd, backlog); err != nil {
+	if err := newError("listen", syscall.Listen(fd, backlog)); err != nil {
 		return fmt.Errorf("cannot listen on %q: %s", addr, err)
 	}
 
@@ -193,7 +193,7 @@ func newSocketCloexecDefault(domain, typ, proto int) (int, error) {
 	}
 
 	// TODO(oleg): move to fdSetup ?
-	if err := syscall.SetNonblock(fd, true); err != nil {
+	if err := newError("setnonblock", syscall.SetNonblock(fd, true)); err != nil {
 		syscall.Close(fd)
 		return -1, fmt.Errorf("cannot make non-blocked listening socket: %s", err)
 	}
