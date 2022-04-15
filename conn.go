@@ -21,7 +21,7 @@ type CtxConn interface {
 //
 // See: TCPListener or UDPListener how to create it.
 type Conn struct {
-	net.Conn
+	net.TCPConn
 	stats     *Stats
 	closeOnce sync.Once
 }
@@ -70,7 +70,7 @@ func (c *Conn) WriteContext(ctx context.Context, b []byte) (n int, err error) {
 // Read can be made to time out and return an error after a fixed
 // time limit; see SetDeadline and SetReadDeadline.
 func (c *Conn) Read(p []byte) (int, error) {
-	n, err := c.Conn.Read(p)
+	n, err := c.TCPConn.Read(p)
 	c.stats.readBytesAdd(n)
 	if err != nil && err != io.EOF {
 		var ne net.Error
@@ -87,7 +87,7 @@ func (c *Conn) Read(p []byte) (int, error) {
 // Write can be made to time out and return an error after a fixed
 // time limit; see SetDeadline and SetWriteDeadline.
 func (c *Conn) Write(p []byte) (int, error) {
-	n, err := c.Conn.Write(p)
+	n, err := c.TCPConn.Write(p)
 	c.stats.writtenBytesAdd(n)
 	if err != nil {
 		var ne net.Error
@@ -103,7 +103,7 @@ func (c *Conn) Write(p []byte) (int, error) {
 func (c *Conn) Close() error {
 	var err error
 	c.closeOnce.Do(func() {
-		err = c.Conn.Close()
+		err = c.TCPConn.Close()
 		c.stats.connsInc()
 		if err != nil {
 			c.stats.closeErrorsInc()

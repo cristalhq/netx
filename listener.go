@@ -3,31 +3,30 @@ package netx
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
+	"net/netip"
 	"time"
 )
 
 // NewTCPListener returns new TCP listener for the given addr.
-//
-// name is used for exported metrics. Each listener in the program must have
-// distinct name.
 func NewTCPListener(ctx context.Context, network, addr string) (*TCPListener, error) {
-	switch network {
-	case "tcp", "tcp4", "tcp6":
-		// ok
-	default:
-		return nil, fmt.Errorf("unknown network: %s", network)
+	a, err := netip.ParseAddrPort(addr)
+	if err != nil {
+		return nil, err
 	}
-
-	ln, err := (&net.ListenConfig{}).Listen(ctx, network, addr)
+	ln, err := net.ListenTCP(network, net.TCPAddrFromAddrPort(a))
 	if err != nil {
 		return nil, err
 	}
 
+	go func() {
+		<-ctx.Done()
+		ln.Close()
+	}()
+
 	tln := &TCPListener{
-		Listener: ln,
-		stats:    &Stats{},
+		TCPListener: *ln,
+		stats:       &Stats{},
 	}
 	return tln, err
 }
@@ -36,14 +35,14 @@ func NewTCPListener(ctx context.Context, network, addr string) (*TCPListener, er
 //
 // It also gathers various stats for the accepted connections.
 type TCPListener struct {
-	net.Listener
+	net.TCPListener
 	stats *Stats
 }
 
 // Accept accepts connections from the addr passed to NewTCPListener.
 func (ln *TCPListener) Accept() (net.Conn, error) {
 	for {
-		conn, err := ln.Listener.Accept()
+		conn, err := ln.TCPListener.Accept()
 		ln.stats.acceptsInc()
 		if err != nil {
 			var ne net.Error
@@ -55,10 +54,15 @@ func (ln *TCPListener) Accept() (net.Conn, error) {
 			return nil, err
 		}
 
+		tcpconn, ok := conn.(*net.TCPConn)
+		if !ok {
+			panic("unreachable")
+		}
+
 		ln.stats.activeConnsInc()
 		sc := &Conn{
-			Conn:  conn,
-			stats: ln.stats,
+			TCPConn: *tcpconn,
+			stats:   ln.stats,
 		}
 		return sc, nil
 	}
