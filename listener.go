@@ -8,8 +8,20 @@ import (
 	"time"
 )
 
+// TCPListenerConfig is a config TCPListener.
+type TCPListenerConfig struct {
+	// ReusePort enables SO_REUSEPORT.
+	ReusePort bool
+
+	// DeferAccept enables TCP_DEFER_ACCEPT.
+	DeferAccept bool
+
+	// FastOpen enables TCP_FASTOPEN.
+	FastOpen bool
+}
+
 // NewTCPListener returns new TCP listener for the given addr.
-func NewTCPListener(ctx context.Context, network, addr string) (*TCPListener, error) {
+func NewTCPListener(ctx context.Context, network, addr string, cfg TCPListenerConfig) (*TCPListener, error) {
 	a, err := netip.ParseAddrPort(addr)
 	if err != nil {
 		return nil, err
@@ -26,6 +38,7 @@ func NewTCPListener(ctx context.Context, network, addr string) (*TCPListener, er
 
 	tln := &TCPListener{
 		TCPListener: *ln,
+		cfg:         cfg,
 		stats:       &Stats{},
 	}
 	return tln, err
@@ -36,6 +49,7 @@ func NewTCPListener(ctx context.Context, network, addr string) (*TCPListener, er
 // It also gathers various stats for the accepted connections.
 type TCPListener struct {
 	net.TCPListener
+	cfg   TCPListenerConfig
 	stats *Stats
 }
 
