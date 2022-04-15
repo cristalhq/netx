@@ -1,5 +1,4 @@
 //go:build darwin || dragonfly || freebsd || netbsd || openbsd || rumprun
-// +build darwin dragonfly freebsd netbsd openbsd rumprun
 
 package netx
 
@@ -7,8 +6,10 @@ import (
 	"syscall"
 )
 
+const soReusePort = syscall.SO_REUSEPORT
+
 func disableNoDelay(fd int) error {
-	return syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1)
+	return nil
 }
 
 func enableReusePort(fd int) error {
@@ -19,7 +20,7 @@ func enableDeferAccept(fd int) error {
 	return nil
 }
 
-func enableFastOpen(fd, _ int) error {
+func enableFastOpen(fd, queueLen int) error {
 	return nil
 }
 
