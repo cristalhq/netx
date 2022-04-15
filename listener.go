@@ -3,6 +3,7 @@ package netx
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"time"
@@ -18,6 +19,18 @@ type TCPListenerConfig struct {
 
 	// FastOpen enables TCP_FASTOPEN.
 	FastOpen bool
+
+	// Queue length for TCP_FASTOPEN (default 256)
+	FastOpenQueueLen int
+}
+
+// TCPListener listens for the addr passed to NewTCPListener.
+//
+// It also gathers various stats for the accepted connections.
+type TCPListener struct {
+	net.TCPListener
+	cfg   TCPListenerConfig
+	stats *Stats
 }
 
 // NewTCPListener returns new TCP listener for the given addr.
@@ -44,15 +57,6 @@ func NewTCPListener(ctx context.Context, network, addr string, cfg TCPListenerCo
 	return tln, err
 }
 
-// TCPListener listens for the addr passed to NewTCPListener.
-//
-// It also gathers various stats for the accepted connections.
-type TCPListener struct {
-	net.TCPListener
-	cfg   TCPListenerConfig
-	stats *Stats
-}
-
 // Accept accepts connections from the addr passed to NewTCPListener.
 func (ln *TCPListener) Accept() (net.Conn, error) {
 	for {
@@ -73,6 +77,10 @@ func (ln *TCPListener) Accept() (net.Conn, error) {
 			panic("unreachable")
 		}
 
+		if err := ln.applyConfigToConn(tcpconn); err != nil {
+			return nil, err
+		}
+
 		ln.stats.activeConnsInc()
 		sc := &Conn{
 			TCPConn: *tcpconn,
@@ -85,4 +93,47 @@ func (ln *TCPListener) Accept() (net.Conn, error) {
 // Stats of the listener and accepted connections.
 func (ln *TCPListener) Stats() *Stats {
 	return ln.stats
+}
+
+func (ln *TCPListener) applyConfigToConn(conn *net.TCPConn) error {
+	rawConn, err := conn.SyscallConn()
+	if err != nil {
+		return err
+	}
+
+	var errControl error
+	rawConn.Control(func(fd uintptr) {
+		errControl = ln.applyConfigToFd(int(fd))
+	})
+	return errControl
+}
+
+func (ln *TCPListener) applyConfigToFd(fd int) error {
+	if err := disableNoDelay(fd); err != nil {
+		return fmt.Errorf("cannot disable Nagle's algorithm: %s", err)
+	}
+
+	if ln.cfg.ReusePort {
+		if err := enableReusePort(fd); err != nil {
+			return fmt.Errorf("unable to set SO_REUSEPORT option: %s", err)
+		}
+	}
+
+	if ln.cfg.FastOpen {
+		queueLen := ln.cfg.FastOpenQueueLen
+		if queueLen <= 0 {
+			queueLen = 256
+		}
+		if err := enableFastOpen(fd, queueLen); err != nil {
+			return fmt.Errorf("unable to set TCP_FASTOPEN option: %s", err)
+		}
+	}
+
+	if ln.cfg.DeferAccept {
+		if err := enableDeferAccept(fd); err != nil {
+			return fmt.Errorf("unable to set TCP_DEFER_ACCEPT option: %s", err)
+		}
+	}
+
+	return nil
 }

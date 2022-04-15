@@ -12,7 +12,7 @@ func ExampleTCP() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	ln, err := netx.NewTCPListener(ctx, "tcp", "127.0.0.1:8099")
+	ln, err := netx.NewTCPListener(ctx, "tcp", "127.0.0.1:8099", netx.TCPListenerConfig{})
 	checkErr(err)
 
 	stats := ln.Stats()
